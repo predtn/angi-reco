@@ -63,7 +63,7 @@ Adding an endpoint: request/response models in `app/schemas/`, the route in `app
 
 ## Migrations
 
-Schema `recommendation` changes only through Alembic (`commit_guide.md` §10).
+Schema `recommendation` changes only through Alembic (`commit_guide.md` §4).
 
 ```bash
 # after changing app/models (pull dev first)
