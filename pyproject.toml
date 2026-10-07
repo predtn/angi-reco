@@ -39,3 +39,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+# The alembic/ folder would otherwise make ruff treat the alembic package as first-party.
+known-third-party = ["alembic"]
