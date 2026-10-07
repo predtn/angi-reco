@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import URL, make_url
 
 API_KEY_MIN_LENGTH = 32
 
@@ -15,8 +16,8 @@ class Settings(BaseSettings):
     )
 
     environment: Literal["development", "test", "production"] = "development"
-    # postgresql+psycopg://angi_reco:<password>@<host>:5432/angi (role angi_reco owns schema
-    # recommendation). Alembic uses the same URL with the sync driver.
+    # postgresql://angi_reco:<password>@<host>:5432/angi (role angi_reco owns schema
+    # recommendation). Any driver in the URL is replaced, see the two properties below.
     database_url: str
     # Shared secret with the backend (Recommendation:ApiKey), sent as header X-Api-Key.
     reco_api_key: SecretStr
@@ -30,6 +31,16 @@ class Settings(BaseSettings):
         if len(value.get_secret_value()) < API_KEY_MIN_LENGTH:
             raise ValueError(f"must be at least {API_KEY_MIN_LENGTH} characters")
         return value
+
+    @property
+    def async_database_url(self) -> URL:
+        # asyncpg, not psycopg: psycopg's async mode does not run on Windows' default event loop.
+        return make_url(self.database_url).set(drivername="postgresql+asyncpg")
+
+    @property
+    def sync_database_url(self) -> URL:
+        # Alembic and the database tests.
+        return make_url(self.database_url).set(drivername="postgresql+psycopg")
 
 
 @lru_cache

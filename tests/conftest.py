@@ -10,9 +10,11 @@ from sqlalchemy.exc import OperationalError
 
 # Settings are read when app.main is imported, so the defaults must exist before any test
 # module imports the app. Real values (CI, a local .env) take precedence.
-os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://angi_reco:reco_dev@localhost:5432/angi")
+os.environ.setdefault("DATABASE_URL", "postgresql://angi_reco:reco_dev@localhost:5432/angi")
 os.environ.setdefault("RECO_API_KEY", "test-only-reco-api-key-0123456789abcdef")
 os.environ.setdefault("ENVIRONMENT", "test")
+
+from app.core.config import get_settings  # noqa: E402  (needs the defaults above)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,13 +28,14 @@ def api_key() -> str:
 def migrated_engine() -> Iterator[Engine]:
     """Database at the latest migration. Tests using it are skipped when no database is reachable,
     unless RECO_DB_TESTS=required (CI), where that is a failure."""
-    engine = create_engine(os.environ["DATABASE_URL"], connect_args={"connect_timeout": 3})
+    url = get_settings().sync_database_url
+    engine = create_engine(url, connect_args={"connect_timeout": 3})
     try:
         with engine.connect():
             pass
     except OperationalError as exc:
         engine.dispose()
-        message = f"Database not reachable ({os.environ['DATABASE_URL']}): {exc.orig}"
+        message = f"Database not reachable ({url.render_as_string()}): {exc.orig}"
         if os.environ.get("RECO_DB_TESTS") == "required":
             pytest.fail(message)
         pytest.skip(message)

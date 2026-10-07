@@ -33,17 +33,16 @@ def _configure(**kwargs) -> None:
 
 
 def run_migrations_offline() -> None:
-    _configure(url=get_settings().database_url, literal_binds=True)
+    _configure(url=get_settings().sync_database_url, literal_binds=True)
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    # Same URL as the app; postgresql+psycopg works with both the async and the sync engine.
     # Role angi_reco defaults to search_path = recommendation, which autogenerate would treat as
     # the unnamed default schema and skip. Every name in the migrations is schema-qualified.
     engine = create_engine(
-        get_settings().database_url,
+        get_settings().sync_database_url,
         poolclass=pool.NullPool,
         connect_args={"options": "-c search_path=public"},
     )
