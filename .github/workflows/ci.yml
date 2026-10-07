@@ -20,6 +20,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # Same image as angi-backend's docker compose.
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: angi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d angi"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://angi_reco:reco_ci@localhost:5432/angi
+      RECO_API_KEY: ci-only-reco-api-key-0123456789abcdef
+      ENVIRONMENT: test
+      # Database tests fail instead of being skipped when the database is unreachable.
+      RECO_DB_TESTS: required
+
     steps:
       - uses: actions/checkout@v7
 
@@ -37,6 +59,26 @@ jobs:
 
       - name: Check format
         run: ruff format --check .
+
+      # Mirrors docker/postgres/init/01-roles-schemas.sh of angi-backend: angi_reco owns only
+      # schema recommendation and cannot create extensions, so vector is installed here.
+      - name: Prepare database
+        run: |
+          docker exec -i ${{ job.services.postgres.id }} psql -U postgres -d angi -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE angi_reco LOGIN PASSWORD 'reco_ci';
+          REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+          CREATE SCHEMA recommendation AUTHORIZATION angi_reco;
+          CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+          ALTER ROLE angi_reco SET search_path = recommendation, public;
+          SQL
+
+      # Every migration must apply, roll back and apply again, and match the models.
+      - name: Check migrations
+        run: |
+          alembic upgrade head
+          alembic check
+          alembic downgrade base
+          alembic upgrade head
 
       - name: Test
         run: pytest --junitxml=test-results/junit.xml
