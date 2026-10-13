@@ -49,7 +49,7 @@ Environment variables, or `.env` locally (never committed):
 ```
 app/
   main.py            create_app(), lifespan (database engine; background jobs start here)
-  core/              settings, errors, X-Api-Key, ontology (12 dimensions, fixed order)
+  core/              settings, errors, X-Api-Key, ontology (12 dimensions, fixed order; scores → vector)
   db/                declarative base (schema recommendation, constraint naming), async session
   models/            one ORM class per table
   schemas/           request / response models
