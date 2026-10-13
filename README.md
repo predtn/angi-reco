@@ -54,13 +54,14 @@ app/
   db/                declarative base (schema recommendation, constraint naming), async session
   models/            one ORM class per table
   schemas/           request / response models
+  services/          the work behind each endpoint (routes stay thin)
   api/router.py      public_router (/health) and protected_router (everything else)
   api/routes/        one module per endpoint group
 alembic/versions/    migrations
 tests/
 ```
 
-Adding an endpoint: request/response models in `app/schemas/`, the route in `app/api/routes/`, then include its router in `protected_router`. Raise `AppError(status, error_code, message)` for expected errors.
+Adding an endpoint: request/response models in `app/schemas/`, the logic in `app/services/`, the route in `app/api/routes/`, then include its router in `protected_router`. Raise `AppError(status, error_code, message)` for expected errors.
 
 ## Migrations
 
