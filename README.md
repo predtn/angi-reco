@@ -34,7 +34,9 @@ Environment variables, or `.env` locally (never committed):
 |---|---|
 | `DATABASE_URL` | `postgresql://angi_reco:<password>@<host>:5432/angi`. The app uses asyncpg, Alembic and tests use psycopg; the driver in the URL is ignored |
 | `RECO_API_KEY` | Shared with the backend (`Recommendation:ApiKey`), at least 32 characters |
-| `LLM_API_KEY` | LLM that generates dish vectors |
+| `LLM_API_KEY` | OpenAI key that generates dish vectors |
+| `LLM_MODEL` | OpenAI model name; it must support structured output (JSON schema). Without `LLM_API_KEY` and `LLM_MODEL` the service starts, but dishes stay `pending` |
+| `LLM_TIMEOUT_SECONDS` | Default `30` |
 | `ENVIRONMENT` | `development`, `test` or `production` |
 | `LOG_LEVEL` | Default `INFO` |
 
@@ -44,6 +46,18 @@ Environment variables, or `.env` locally (never committed):
 - JSON is snake_case and **not** wrapped in `ApiResponse`: a 2xx body is the DTO itself.
 - Every error body is `{"error_code": "...", "message": "...", "errors": {...}}`; `errors` (field → messages) only for 422 `VALIDATION_FAILED`. The backend branches on `error_code`.
 - The outbox worker treats 4xx as final (dead) and 5xx as retryable, so return 503 (with `Retry-After`) for "try again later", never a 4xx.
+
+### Dish vectors
+
+RECO-01 answers at once with the dish `pending`; its vector is generated right after in a background task. A loop started with the app retries `pending` / `failed` dishes every 5 minutes, at most 5 times per content (`attempt_count`), so a dish still `failed` after 5 tries keeps its `last_error` for inspection (Design §2.4).
+
+Before the backend's outbox worker exists, send the dishes already in `core.dishes` once (rerunning is harmless):
+
+```bash
+python scripts/backfill_dishes.py --core-database-url postgresql://angi_backend:backend_dev@localhost:5432/angi --reco-url http://localhost:8000
+```
+
+The script is the only code that reads schema `core`, with the backend role; the service never does.
 
 ## Project layout
 

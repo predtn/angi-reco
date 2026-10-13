@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -9,16 +11,32 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.db.session import create_engine
+from app.services.dish_scorer import create_scorer
+from app.services.dish_vectors import run_regeneration_loop
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # Background jobs (e.g. regenerating pending dish vectors every 5 minutes) start here too.
-    engine = create_engine(get_settings())
+    settings = get_settings()
+    engine = create_engine(settings)
     app.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+    # None until LLM_API_KEY and LLM_MODEL are set: dishes then stay pending (Design §2.4).
+    app.state.dish_scorer = create_scorer(settings)
+    loop_task = None
+    if app.state.dish_scorer is None:
+        logging.getLogger(__name__).warning("LLM_API_KEY / LLM_MODEL not set: no dish vectors")
+    else:
+        # Retries pending / failed dish vectors every 5 minutes.
+        loop_task = asyncio.create_task(
+            run_regeneration_loop(app.state.sessionmaker, app.state.dish_scorer)
+        )
     try:
         yield
     finally:
+        if loop_task is not None:
+            loop_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await loop_task
         await engine.dispose()
 
 

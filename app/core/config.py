@@ -21,8 +21,11 @@ class Settings(BaseSettings):
     database_url: str
     # Shared secret with the backend (Recommendation:ApiKey), sent as header X-Api-Key.
     reco_api_key: SecretStr
-    # Key of the LLM that generates dish vectors; required once dish upsert exists.
+    # OpenAI key and model that generate dish vectors (Design §2.4). Without both, dishes stay
+    # pending and the background loop does not run.
     llm_api_key: SecretStr | None = None
+    llm_model: str | None = None
+    llm_timeout_seconds: float = 30
     log_level: str = "INFO"
 
     @field_validator("reco_api_key")
