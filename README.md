@@ -5,6 +5,7 @@ Recommendation service (FastAPI) for the ANGI capstone project. It scores the ca
 | Source | Covers |
 |---|---|
 | `.docs/Recommendation_System_Design_Ver1.1.docx` | Algorithm, ontology, backend ↔ reco split |
+| `.docs/Preference_Survey_Ver1.0.md` | Survey questions, `option_code`s and their vectors (`survey_option_vectors`) |
 | `angi-backend/.docs/ANGI_API_Design_Ver1.8.xlsx`, sheet "Reco API (nội bộ)" | Endpoints RECO-01..09 |
 | `angi-backend/.docs/ANGI_Data_Dictionary_Ver1.2.xlsx`, sheet "Recommendation" | Tables and columns |
 | `angi-backend/.agents/commit_guide.md` | Branches, commits, pull requests |
