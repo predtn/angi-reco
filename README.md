@@ -5,6 +5,7 @@ Recommendation service (FastAPI) for the ANGI capstone project. It scores the ca
 | Source | Covers |
 |---|---|
 | `.docs/Recommendation_System_Design_Ver1.1.docx` | Algorithm, ontology, backend ↔ reco split |
+| `.docs/Preference_Survey_Ver1.0.md` | Survey questions, `option_code`s and their vectors (`survey_option_vectors`) |
 | `angi-backend/.docs/ANGI_API_Design_Ver1.8.xlsx`, sheet "Reco API (nội bộ)" | Endpoints RECO-01..09 |
 | `angi-backend/.docs/ANGI_Data_Dictionary_Ver1.2.xlsx`, sheet "Recommendation" | Tables and columns |
 | `angi-backend/.agents/commit_guide.md` | Branches, commits, pull requests |
@@ -53,13 +54,14 @@ app/
   db/                declarative base (schema recommendation, constraint naming), async session
   models/            one ORM class per table
   schemas/           request / response models
+  services/          the work behind each endpoint (routes stay thin)
   api/router.py      public_router (/health) and protected_router (everything else)
   api/routes/        one module per endpoint group
 alembic/versions/    migrations
 tests/
 ```
 
-Adding an endpoint: request/response models in `app/schemas/`, the route in `app/api/routes/`, then include its router in `protected_router`. Raise `AppError(status, error_code, message)` for expected errors.
+Adding an endpoint: request/response models in `app/schemas/`, the logic in `app/services/`, the route in `app/api/routes/`, then include its router in `protected_router`. Raise `AppError(status, error_code, message)` for expected errors.
 
 ## Migrations
 
