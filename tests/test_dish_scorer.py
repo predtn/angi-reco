@@ -70,8 +70,15 @@ def test_unusable_answers_raise_scoring_error(completions: _FakeCompletions) -> 
         asyncio.run(_scorer(completions).score("Phở", None))
 
 
-def test_scorer_needs_both_key_and_model() -> None:
-    base = {"database_url": "postgresql://x@localhost/x", "reco_api_key": "k" * 32}
+def test_scorer_needs_both_key_and_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Only the values given here count, not a developer's .env or environment.
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    base: dict[str, Any] = {
+        "_env_file": None,
+        "database_url": "postgresql://x@localhost/x",
+        "reco_api_key": "k" * 32,
+    }
 
     assert create_scorer(Settings(**base)) is None
     assert create_scorer(Settings(**base, llm_api_key="sk-test")) is None
