@@ -57,3 +57,11 @@ def db(migrated_engine: Engine) -> Iterator[Connection]:
             yield connection
         finally:
             transaction.rollback()
+
+
+@pytest.fixture(autouse=True)
+def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The app under test never builds the OpenAI scorer, even when a developer's .env has a key:
+    the background loop would otherwise call OpenAI (and spend money) at startup. Tests that need
+    a scorer set app.state.dish_scorer to a fake."""
+    monkeypatch.setattr("app.main.create_scorer", lambda settings: None)
