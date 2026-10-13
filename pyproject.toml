@@ -33,6 +33,8 @@ include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The editable install only maps app/; tests also import scripts/ from the project root.
+pythonpath = ["."]
 addopts = "-ra"
 
 [tool.ruff]
