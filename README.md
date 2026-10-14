@@ -25,6 +25,7 @@ uvicorn app.main:app --reload --port 8000
 
 - `GET http://localhost:8000/health` → `{"status": "ok", "db": "ok", "active_config_version": 1}`
 - API docs: http://localhost:8000/docs (not served in production)
+- Programs that call the service (the backend's `Recommendation:BaseUrl`, `scripts/backfill_dishes.py`) use `http://127.0.0.1:8000`, not `localhost`: uvicorn listens on IPv4 only, and Windows first tries `localhost` over IPv6, which takes about 2 s to fail, past the backend's 800 ms timeout.
 
 ### Configuration
 
@@ -54,7 +55,7 @@ RECO-01 answers at once with the dish `pending`; its vector is generated right a
 Before the backend's outbox worker exists, send the dishes already in `core.dishes` once (rerunning is harmless):
 
 ```bash
-python scripts/backfill_dishes.py --core-database-url postgresql://angi_backend:backend_dev@localhost:5432/angi --reco-url http://localhost:8000
+python scripts/backfill_dishes.py --core-database-url postgresql://angi_backend:backend_dev@localhost:5432/angi --reco-url http://127.0.0.1:8000
 ```
 
 The script is the only code that reads schema `core`, with the backend role; the service never does.
