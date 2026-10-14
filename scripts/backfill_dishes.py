@@ -7,7 +7,7 @@ The reco service itself never reads schema core; only this script does, with the
 
     python scripts/backfill_dishes.py \\
         --core-database-url postgresql://angi_backend:backend_dev@localhost:5432/angi \\
-        --reco-url http://localhost:8000
+        --reco-url http://127.0.0.1:8000
 
 RECO_API_KEY is read like the service reads it (environment, then .env).
 """
@@ -66,7 +66,9 @@ def _post(reco_url: str, api_key: str, payload: dict[str, Any]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--core-database-url", required=True, help="angi_backend connection URL")
-    parser.add_argument("--reco-url", default="http://localhost:8000")
+    # 127.0.0.1, not localhost: uvicorn listens on IPv4 only, and Windows first tries localhost over
+    # IPv6, which takes about 2 s to fail on every new connection.
+    parser.add_argument("--reco-url", default="http://127.0.0.1:8000")
     args = parser.parse_args()
     api_key = get_settings().reco_api_key.get_secret_value()
 
