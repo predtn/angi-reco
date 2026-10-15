@@ -52,13 +52,21 @@ Environment variables, or `.env` locally (never committed):
 
 RECO-01 answers at once with the dish `pending`; its vector is generated right after in a background task. A loop started with the app retries `pending` / `failed` dishes every 5 minutes, at most 5 times per content (`attempt_count`), so a dish still `failed` after 5 tries keeps its `last_error` for inspection (Design §2.4).
 
-Before the backend's outbox worker exists, send the dishes already in `core.dishes` once (rerunning is harmless):
+The backend's outbox worker sends every dish change from then on. Dishes that were already in `core.dishes` before reco first ran can be sent once with the backfill script (rerunning is harmless):
 
 ```bash
 python scripts/backfill_dishes.py --core-database-url postgresql://angi_backend:backend_dev@localhost:5432/angi --reco-url http://127.0.0.1:8000
 ```
 
 The script is the only code that reads schema `core`, with the backend role; the service never does.
+
+### Feedback
+
+RECO-04 (`POST /feedback`, sent by the outbox worker for each like / dislike) applies Design §5.2 in one transaction that locks the user's row:
+
+- A known `event_uuid` answers `duplicate` and changes nothing, also when the same event arrives twice at once.
+- A dish reco never received is 404 `DISH_NOT_FOUND` (the worker marks the event dead). A dish whose vector is `pending` or `failed` is 503 `DISH_VECTOR_NOT_READY` with `Retry-After: 60`, so the worker retries; the user's later events wait behind it. A deactivated dish that has a vector still counts.
+- `occurred_at` needs a time zone: the latest `occurred_at` is the vote counted in `dish_stats`. An older event that arrives late still adds to r, n, the user vector and m.
 
 ## Project layout
 

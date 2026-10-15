@@ -6,6 +6,8 @@ Recommend    = (1 − γ)·Final + γ·Exploration                       (§3.4)
 
 Ranking is a stable sort on Recommend, so ties keep the order the backend sent (restaurant rating,
 then like_count; §3.6).
+
+RECO-04 updates the inputs after each like / dislike with implicit_score and move_user_vector.
 """
 
 import math
@@ -149,3 +151,27 @@ def rank_candidates(
         ScoredCandidate(**{**item.__dict__, "rank": position})
         for position, item in enumerate(ordered, start=1)
     ]
+
+
+# Online updates after a like / dislike (§3.2, §5.2; RECO-04).
+
+
+def implicit_score(raw: float) -> float:
+    """Implicit = SoftSign01(r) = 0.5 + 0.5·r / (1 + |r|), always from the raw sum r (§3.2)."""
+    return 0.5 + 0.5 * raw / (1 + abs(raw))
+
+
+def move_user_vector(
+    user: Sequence[float] | None, dish: Sequence[float], beta_u: float, w: int
+) -> list[float] | None:
+    """User_new = User_old + β_u·w·(Dish − User_old), with User_old = 0 when the user has no vector
+    yet, so a first like gives β_u·Dish and a first dislike −β_u·Dish (§3.2).
+
+    Returns None instead of the zero vector, which is never stored (cosine is undefined for it).
+    """
+    old = [0.0] * len(dish) if user is None else [float(value) for value in user]
+    new = [
+        value + beta_u * w * (float(target) - value)
+        for value, target in zip(old, dish, strict=True)
+    ]
+    return new if any(new) else None
