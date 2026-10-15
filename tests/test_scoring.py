@@ -10,7 +10,9 @@ from app.services.scoring import (
     UserState,
     cosine,
     exploration_score,
+    implicit_score,
     minmax_explicit,
+    move_user_vector,
     rank_candidates,
     wilson_lower_bound,
 )
@@ -130,3 +132,40 @@ def test_gamma_mixes_in_exploration() -> None:
     # Both have Final 0; the dish never shown explores more and moves up.
     assert [item.dish_id for item in ranked] == [2, 1]
     assert ranked[0].recommend == pytest.approx(0.1 * exploration_score(20, 0))
+
+
+def test_implicit_squashes_the_raw_sum_with_the_examples_of_the_design() -> None:
+    assert implicit_score(0) == 0.5
+    # β_s = 0.03: 3 likes ≈ 0.541, 10 likes ≈ 0.615, 50 likes = 0.8 (§3.2)
+    assert implicit_score(3 * 0.03) == pytest.approx(0.541, abs=1e-3)
+    assert implicit_score(10 * 0.03) == pytest.approx(0.615, abs=1e-3)
+    assert implicit_score(50 * 0.03) == pytest.approx(0.8)
+    assert implicit_score(-0.09) == pytest.approx(1 - implicit_score(0.09))
+
+
+def test_first_feedback_without_a_user_vector_starts_from_zero() -> None:
+    dish = _vector(spicy=1, umami=0.5)
+
+    assert move_user_vector(None, dish, 0.03, 1) == pytest.approx(_vector(spicy=0.03, umami=0.015))
+    assert move_user_vector(None, dish, 0.03, -1) == pytest.approx(
+        _vector(spicy=-0.03, umami=-0.015)
+    )
+
+
+def test_feedback_moves_the_user_vector_towards_or_away_from_the_dish() -> None:
+    user = _vector(sweet=1)
+    dish = _vector(spicy=1)
+
+    liked = move_user_vector(user, dish, 0.1, 1)
+    disliked = move_user_vector(user, dish, 0.1, -1)
+
+    assert liked == pytest.approx(_vector(sweet=0.9, spicy=0.1))
+    assert disliked == pytest.approx(_vector(sweet=1.1, spicy=-0.1))
+    assert cosine(liked, dish) > cosine(user, dish) > cosine(disliked, dish)  # type: ignore[operator]
+
+
+def test_a_vector_that_reaches_zero_is_stored_as_none() -> None:
+    # A dislike with β_u = 1 from User = Dish/2 gives 2·User − Dish = 0.
+    dish = _vector(spicy=1)
+
+    assert move_user_vector(_vector(spicy=0.5), dish, 1, -1) is None
