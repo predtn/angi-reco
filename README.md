@@ -35,8 +35,9 @@ Environment variables, or `.env` locally (never committed):
 |---|---|
 | `DATABASE_URL` | `postgresql://angi_reco:<password>@<host>:5432/angi`. The app uses asyncpg, Alembic and tests use psycopg; the driver in the URL is ignored |
 | `RECO_API_KEY` | Shared with the backend (`Recommendation:ApiKey`), at least 32 characters |
-| `LLM_API_KEY` | OpenAI key that generates dish vectors |
-| `LLM_MODEL` | OpenAI model name; it must support structured output (JSON schema). Without `LLM_API_KEY` and `LLM_MODEL` the service starts, but dishes stay `pending` |
+| `LLM_API_KEY` | Provider key that generates dish vectors |
+| `LLM_MODEL` | Model name; it must support structured output (JSON schema). Without `LLM_API_KEY` and `LLM_MODEL` the service starts, but dishes stay `pending` |
+| `LLM_BASE_URL` | OpenAI-compatible endpoint; defaults to `https://api.openai.com/v1/`. For Gemini use `https://generativelanguage.googleapis.com/v1beta/openai/` with a Gemini key and model |
 | `LLM_TIMEOUT_SECONDS` | Default `30` |
 | `ENVIRONMENT` | `development`, `test` or `production` |
 | `LOG_LEVEL` | Default `INFO` |

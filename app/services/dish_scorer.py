@@ -62,9 +62,13 @@ class DishScorer(Protocol):
 
 
 class OpenAIDishScorer:
-    def __init__(self, api_key: str, model: str, timeout_seconds: float) -> None:
+    def __init__(
+        self, api_key: str, model: str, timeout_seconds: float, base_url: str | None = None
+    ) -> None:
         self.model_name = model
-        self._client = AsyncOpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=1)
+        self._client = AsyncOpenAI(
+            api_key=api_key, base_url=base_url, timeout=timeout_seconds, max_retries=1
+        )
 
     async def score(self, name: str, description: str | None) -> ScoredDish:
         dish = f"Name: {name}\nDescription: {description or '(none)'}"
@@ -97,5 +101,8 @@ def create_scorer(settings: Settings) -> DishScorer | None:
     if settings.llm_api_key is None or not settings.llm_model:
         return None
     return OpenAIDishScorer(
-        settings.llm_api_key.get_secret_value(), settings.llm_model, settings.llm_timeout_seconds
+        settings.llm_api_key.get_secret_value(),
+        settings.llm_model,
+        settings.llm_timeout_seconds,
+        settings.llm_base_url,
     )
