@@ -109,6 +109,11 @@ Adding an endpoint: request/response models in `app/schemas/`, the logic in `app
 
 ## Migrations
 
+Conversation taste vectors and commit-only Agent impressions are documented in
+[Conversation Preferences v1](.docs/Conversation_Preferences_Ver1.0.md).
+Deploy reco migration `0004` and this service before the matching backend migration/service.
+Existing recommendation requests continue to use the long-term profile by default.
+
 Schema `recommendation` changes only through Alembic (`commit_guide.md` §4).
 
 ```bash

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from app.api.routes import dishes, feedback, health, recommendations, survey
+from app.api.routes import dishes, feedback, health, recommendations, survey, user_preferences
 from app.core.security import require_api_key
 
 # Endpoints called by the backend and the outbox worker (RECO-01..06, RECO-09).
@@ -10,6 +10,7 @@ protected_router.include_router(dishes.router)
 protected_router.include_router(feedback.router)
 protected_router.include_router(recommendations.router)
 protected_router.include_router(survey.router)
+protected_router.include_router(user_preferences.router)
 
 # Endpoints without X-Api-Key: only /health (RECO-07), polled by Render and the Admin.
 public_router = APIRouter()

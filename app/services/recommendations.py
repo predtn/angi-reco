@@ -51,6 +51,8 @@ async def recommend(
     candidate_dish_ids: Sequence[int],
     top_k: int,
     context: str,
+    vector_source: str = "profile",
+    user_vector_override: Sequence[float] | None = None,
 ) -> RecommendationResult:
     """RECO-05. `user_id` None = Guest: ranked by Wilson, nothing logged, request_id None.
 
@@ -104,6 +106,15 @@ async def recommend(
             )
         }
 
+        if vector_source == "conversation":
+            user = UserState(
+                vector=user_vector_override
+                if user_vector_override is not None and any(user_vector_override)
+                else None,
+                m=user.m,
+                n_total=user.n_total,
+            )
+
     candidates = []
     for dish_id in ordered_ids:
         dish = dishes.get(dish_id)
@@ -133,6 +144,8 @@ async def recommend(
             user_id=user_id,
             config_version=config.config_version,
             context=context,
+            vector_source=vector_source,
+            effective_vector=None if user.vector is None else [float(v) for v in user.vector],
             m=user.m,
             n_total=user.n_total,
             delta=delta,
@@ -174,6 +187,7 @@ async def record_impressions(
     request_id: uuid.UUID,
     dish_ids: Sequence[int],
     shown_at: datetime | None,
+    agent_proposal_id: int | None = None,
 ) -> ImpressionResult:
     """RECO-06: marks the dishes of a request as shown and adds 1 to N_i of each and to N_total.
 
@@ -190,6 +204,14 @@ async def record_impressions(
             status.HTTP_403_FORBIDDEN, "FORBIDDEN", "The request belongs to another user."
         )
 
+    source = await session.scalar(
+        select(RecommendationLog.vector_source).where(RecommendationLog.request_id == request_id)
+    )
+    if source == "conversation" and agent_proposal_id is None:
+        raise AppError(
+            409, "AGENT_COMMIT_REQUIRED", "Agent impressions require a committed proposal."
+        )
+
     requested = list(dict.fromkeys(dish_ids))
     counted_rows = await session.scalars(
         update(RecommendationItem)
@@ -198,7 +220,10 @@ async def record_impressions(
             RecommendationItem.dish_id.in_(requested),
             RecommendationItem.shown_at.is_(None),
         )
-        .values(shown_at=func.now() if shown_at is None else shown_at)
+        .values(
+            shown_at=func.now() if shown_at is None else shown_at,
+            agent_proposal_id=agent_proposal_id,
+        )
         .returning(RecommendationItem.dish_id)
     )
     counted_set = set(counted_rows)
