@@ -5,6 +5,7 @@ like_count) with the scores of Design §3, and logs every candidate for evaluati
 counts impressions: N_i and N_total grow only through RECO-06, when the app really showed a dish.
 """
 
+import logging
 import time
 import uuid
 from collections.abc import Sequence
@@ -17,6 +18,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError
+from app.db.base import SCHEMA
 from app.models import (
     AlgorithmConfig,
     DishStats,
@@ -28,6 +30,8 @@ from app.models import (
 )
 from app.models.enums import DishVectorStatus
 from app.services.scoring import Candidate, Params, ScoredCandidate, UserState, rank_candidates
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -51,6 +55,8 @@ async def recommend(
     candidate_dish_ids: Sequence[int],
     top_k: int,
     context: str,
+    vector_source: str = "profile",
+    user_vector_override: Sequence[float] | None = None,
 ) -> RecommendationResult:
     """RECO-05. `user_id` None = Guest: ranked by Wilson, nothing logged, request_id None.
 
@@ -104,6 +110,16 @@ async def recommend(
             )
         }
 
+        if vector_source == "conversation":
+            user = UserState(
+                vector=user_vector_override
+                if user_vector_override is not None and any(user_vector_override)
+                else None,
+                m=user.m,
+                n_total=user.n_total,
+            )
+
+    loaded_at = time.perf_counter()
     candidates = []
     for dish_id in ordered_ids:
         dish = dishes.get(dish_id)
@@ -123,6 +139,7 @@ async def recommend(
         )
 
     ranked = rank_candidates(candidates, user, params)
+    ranked_at = time.perf_counter()
     if user_id is None or user is None or not ranked:
         return RecommendationResult(None, config.config_version, ranked[:top_k], ignored)
 
@@ -133,6 +150,8 @@ async def recommend(
             user_id=user_id,
             config_version=config.config_version,
             context=context,
+            vector_source=vector_source,
+            effective_vector=None if user.vector is None else [float(v) for v in user.vector],
             m=user.m,
             n_total=user.n_total,
             delta=delta,
@@ -142,29 +161,64 @@ async def recommend(
         )
         .returning(RecommendationLog.request_id)
     )
-    # Every candidate is logged with all its scores, returned or not (evaluation plan, §6).
-    await session.execute(
-        insert(RecommendationItem),
-        [
-            {
-                "request_id": request_id,
-                "dish_id": item.dish_id,
-                "rank": item.rank,
-                "is_returned": item.rank <= top_k,
-                "cosine_sim": item.cosine,
-                "explicit_score": item.explicit,
-                "implicit_score": item.implicit,
-                "alpha": item.alpha,
-                "personalized": item.personalized,
-                "wilson": item.wilson,
-                "final_score": item.final,
-                "exploration": item.exploration,
-                "recommend_score": item.recommend,
-            }
+    # Binary COPY avoids ORM processing of up to 2,000 score rows on the request event loop.
+    # Use the session's existing asyncpg connection so the log and all scores remain atomic.
+    connection = await session.connection()
+    raw_connection = await connection.get_raw_connection()
+    await raw_connection.driver_connection.copy_records_to_table(
+        RecommendationItem.__tablename__,
+        schema_name=SCHEMA,
+        columns=(
+            "request_id",
+            "dish_id",
+            "rank",
+            "is_returned",
+            "cosine_sim",
+            "explicit_score",
+            "implicit_score",
+            "alpha",
+            "personalized",
+            "wilson",
+            "final_score",
+            "exploration",
+            "recommend_score",
+        ),
+        records=[
+            (
+                request_id,
+                item.dish_id,
+                item.rank,
+                item.rank <= top_k,
+                item.cosine,
+                item.explicit,
+                item.implicit,
+                item.alpha,
+                item.personalized,
+                item.wilson,
+                item.final,
+                item.exploration,
+                item.recommend,
+            )
             for item in ranked
         ],
     )
+    # Include score persistence in the stored latency, rather than only reads and scoring.
+    await session.execute(
+        update(RecommendationLog)
+        .where(RecommendationLog.request_id == request_id)
+        .values(latency_ms=round((time.perf_counter() - started) * 1000))
+    )
     await session.commit()
+    completed_at = time.perf_counter()
+    logger.info(
+        "Recommendation completed candidates=%s query_ms=%.1f scoring_ms=%.1f "
+        "persistence_ms=%.1f total_ms=%.1f",
+        len(ordered_ids),
+        (loaded_at - started) * 1000,
+        (ranked_at - loaded_at) * 1000,
+        (completed_at - ranked_at) * 1000,
+        (completed_at - started) * 1000,
+    )
     return RecommendationResult(request_id, config.config_version, ranked[:top_k], ignored)
 
 
@@ -174,6 +228,7 @@ async def record_impressions(
     request_id: uuid.UUID,
     dish_ids: Sequence[int],
     shown_at: datetime | None,
+    agent_proposal_id: int | None = None,
 ) -> ImpressionResult:
     """RECO-06: marks the dishes of a request as shown and adds 1 to N_i of each and to N_total.
 
@@ -190,6 +245,14 @@ async def record_impressions(
             status.HTTP_403_FORBIDDEN, "FORBIDDEN", "The request belongs to another user."
         )
 
+    source = await session.scalar(
+        select(RecommendationLog.vector_source).where(RecommendationLog.request_id == request_id)
+    )
+    if source == "conversation" and agent_proposal_id is None:
+        raise AppError(
+            409, "AGENT_COMMIT_REQUIRED", "Agent impressions require a committed proposal."
+        )
+
     requested = list(dict.fromkeys(dish_ids))
     counted_rows = await session.scalars(
         update(RecommendationItem)
@@ -198,7 +261,10 @@ async def record_impressions(
             RecommendationItem.dish_id.in_(requested),
             RecommendationItem.shown_at.is_(None),
         )
-        .values(shown_at=func.now() if shown_at is None else shown_at)
+        .values(
+            shown_at=func.now() if shown_at is None else shown_at,
+            agent_proposal_id=agent_proposal_id,
+        )
         .returning(RecommendationItem.dish_id)
     )
     counted_set = set(counted_rows)

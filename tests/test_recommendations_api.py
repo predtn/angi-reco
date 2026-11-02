@@ -5,10 +5,12 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from asyncpg import UniqueViolationError
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 
 from app.main import create_app
+from app.services import recommendations
 
 # Far from real core ids; every test deletes its rows.
 USER_ID = 900_301
@@ -271,8 +273,39 @@ def test_two_thousand_candidates_are_ranked_within_the_backend_budget(
     assert len(response.json()["items"]) == 200
     # Identical dishes: the order sent is kept.
     assert [item["dish_id"] for item in response.json()["items"]] == ids[:200]
+    with migrated_engine.connect() as connection:
+        counts = connection.execute(
+            text(
+                "SELECT count(*), count(*) FILTER (WHERE is_returned),"
+                " count(*) FILTER (WHERE shown_at IS NOT NULL)"
+                " FROM recommendation.recommendation_items WHERE request_id = :r"
+            ),
+            {"r": response.json()["request_id"]},
+        ).one()
+    assert tuple(counts) == (2000, 200, 0)
     # The backend waits 800 ms; leave room for slower machines and CI.
     assert elapsed < 0.8, f"took {elapsed:.3f}s"
+
+
+def test_score_copy_failure_rolls_back_the_parent_log(
+    client: TestClient, migrated_engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_rank = recommendations.rank_candidates
+
+    def duplicate_dish(*args: Any, **kwargs: Any) -> Any:
+        ranked = original_rank(*args, **kwargs)
+        return [*ranked, ranked[0]]
+
+    monkeypatch.setattr(recommendations, "rank_candidates", duplicate_dish)
+    with pytest.raises(UniqueViolationError):
+        _recommend(client)
+
+    with migrated_engine.connect() as connection:
+        count = connection.execute(
+            text("SELECT count(*) FROM recommendation.recommendation_logs WHERE user_id = :u"),
+            {"u": USER_ID},
+        ).scalar_one()
+    assert count == 0
 
 
 @pytest.mark.parametrize(

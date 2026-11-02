@@ -2,8 +2,9 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, FiniteFloat, model_validator
 
 from app.models.enums import RecoContext
 
@@ -18,6 +19,20 @@ class RecommendationRequest(BaseModel):
     candidate_dish_ids: list[int] = Field(min_length=1, max_length=2000)
     top_k: int = Field(default=DEFAULT_TOP_K, ge=1, le=200)
     context: RecoContext
+    vector_source: Literal["profile", "conversation"] = "profile"
+    user_vector_override: list[FiniteFloat] | None = Field(
+        default=None, min_length=12, max_length=12
+    )
+
+    @model_validator(mode="after")
+    def validate_vector_source(self) -> "RecommendationRequest":
+        if self.vector_source == "conversation" and self.user_id is None:
+            raise ValueError("A conversation vector requires user_id.")
+        if self.vector_source == "profile" and self.user_vector_override is not None:
+            raise ValueError("A vector override requires vector_source=conversation.")
+        if self.user_vector_override is not None and not any(self.user_vector_override):
+            self.user_vector_override = None
+        return self
 
 
 class RecoItem(BaseModel):
@@ -31,6 +46,7 @@ class RecoItem(BaseModel):
 
 
 class RecommendationResponse(BaseModel):
+    vector_source: Literal["profile", "conversation"] = "profile"
     # null for a Guest (not logged)
     request_id: uuid.UUID | None
     config_version: int
@@ -44,6 +60,7 @@ class ImpressionRequest(BaseModel):
     request_id: uuid.UUID
     dish_ids: list[int] = Field(min_length=1, max_length=200)
     shown_at: datetime | None = None
+    agent_proposal_id: int | None = Field(default=None, gt=0)
 
 
 class ImpressionResponse(BaseModel):

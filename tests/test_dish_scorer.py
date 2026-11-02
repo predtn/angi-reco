@@ -88,6 +88,45 @@ def test_scorer_needs_both_key_and_model(monkeypatch: pytest.MonkeyPatch) -> Non
     assert scorer.model_name == "test-model"
 
 
+@pytest.mark.parametrize(
+    "endpoint",
+    [None, "https://generativelanguage.googleapis.com/v1beta/openai/"],
+    ids=["default-openai", "configured-provider"],
+)
+def test_scorer_passes_configured_provider_to_client(
+    monkeypatch: pytest.MonkeyPatch, endpoint: str | None
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def client(**kwargs: Any) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace()
+
+    monkeypatch.setattr(dish_scorer, "AsyncOpenAI", client)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
+    if endpoint is not None:
+        monkeypatch.setenv("LLM_BASE_URL", endpoint)
+    settings = Settings(
+        _env_file=None,
+        database_url="postgresql://x@localhost/x",
+        reco_api_key="k" * 32,
+        llm_api_key="test-only-key",
+        llm_model="test-model",
+        llm_timeout_seconds=17,
+    )
+
+    scorer = create_scorer(settings)
+
+    assert isinstance(scorer, OpenAIDishScorer)
+    assert scorer.model_name == "test-model"
+    assert captured == {
+        "api_key": "test-only-key",
+        "base_url": endpoint or "https://api.openai.com/v1/",
+        "timeout": 17,
+        "max_retries": 1,
+    }
+
+
 def test_backfill_payload_matches_reco_01() -> None:
     row = {
         "id": 105,

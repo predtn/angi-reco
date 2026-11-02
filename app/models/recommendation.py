@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, in_check
@@ -43,6 +44,8 @@ class RecommendationLog(Base):
     candidate_count: Mapped[int] = mapped_column(Integer)
     top_k: Mapped[int] = mapped_column(Integer)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+    vector_source: Mapped[str] = mapped_column(String(16), server_default=text("'profile'"))
+    effective_vector: Mapped[list[float] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = created_at()
 
 
@@ -70,3 +73,4 @@ class RecommendationItem(Base):
     recommend_score: Mapped[float] = mapped_column(REAL)
     # First time the dish was shown to the user (POST /impressions); NULL = not seen
     shown_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    agent_proposal_id: Mapped[int | None] = mapped_column(BigInteger)

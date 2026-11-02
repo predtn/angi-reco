@@ -22,9 +22,16 @@ Session = Annotated[AsyncSession, Depends(get_session)]
 async def recommend(body: RecommendationRequest, session: Session) -> RecommendationResponse:
     """RECO-05: ranks the backend's candidates (Design §3). Does not count impressions."""
     result = await recommendations.recommend(
-        session, body.user_id, body.candidate_dish_ids, body.top_k, body.context
+        session,
+        body.user_id,
+        body.candidate_dish_ids,
+        body.top_k,
+        body.context,
+        body.vector_source,
+        body.user_vector_override,
     )
     return RecommendationResponse(
+        vector_source=body.vector_source,
         request_id=result.request_id,
         config_version=result.config_version,
         items=[
@@ -47,7 +54,12 @@ async def recommend(body: RecommendationRequest, session: Session) -> Recommenda
 async def record_impressions(body: ImpressionRequest, session: Session) -> ImpressionResponse:
     """RECO-06: dishes the app really showed; each counts once per request."""
     result = await recommendations.record_impressions(
-        session, body.user_id, body.request_id, body.dish_ids, body.shown_at
+        session,
+        body.user_id,
+        body.request_id,
+        body.dish_ids,
+        body.shown_at,
+        body.agent_proposal_id,
     )
     return ImpressionResponse(
         request_id=result.request_id, counted=result.counted, ignored=result.ignored

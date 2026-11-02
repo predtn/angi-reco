@@ -35,8 +35,9 @@ Environment variables, or `.env` locally (never committed):
 |---|---|
 | `DATABASE_URL` | `postgresql://angi_reco:<password>@<host>:5432/angi`. The app uses asyncpg, Alembic and tests use psycopg; the driver in the URL is ignored |
 | `RECO_API_KEY` | Shared with the backend (`Recommendation:ApiKey`), at least 32 characters |
-| `LLM_API_KEY` | OpenAI key that generates dish vectors |
-| `LLM_MODEL` | OpenAI model name; it must support structured output (JSON schema). Without `LLM_API_KEY` and `LLM_MODEL` the service starts, but dishes stay `pending` |
+| `LLM_API_KEY` | Provider key that generates dish vectors |
+| `LLM_MODEL` | Model name; it must support structured output (JSON schema). Without `LLM_API_KEY` and `LLM_MODEL` the service starts, but dishes stay `pending` |
+| `LLM_BASE_URL` | OpenAI endpoint; defaults to `https://api.openai.com/v1/` |
 | `LLM_TIMEOUT_SECONDS` | Default `30` |
 | `ENVIRONMENT` | `development`, `test` or `production` |
 | `LOG_LEVEL` | Default `INFO` |
@@ -107,6 +108,11 @@ tests/
 Adding an endpoint: request/response models in `app/schemas/`, the logic in `app/services/`, the route in `app/api/routes/`, then include its router in `protected_router`. Raise `AppError(status, error_code, message)` for expected errors.
 
 ## Migrations
+
+Conversation taste vectors and commit-only Agent impressions are documented in
+[Conversation Preferences v1](.docs/Conversation_Preferences_Ver1.0.md).
+Deploy reco migration `0004` and this service before the matching backend migration/service.
+Existing recommendation requests continue to use the long-term profile by default.
 
 Schema `recommendation` changes only through Alembic (`commit_guide.md` §4).
 
