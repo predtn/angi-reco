@@ -13,6 +13,7 @@ from app.core.errors import register_exception_handlers
 from app.db.session import create_engine
 from app.services.dish_scorer import create_scorer
 from app.services.dish_vectors import run_regeneration_loop
+from app.services.log_retention import run_retention_loop
 
 
 @asynccontextmanager
@@ -30,9 +31,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         loop_task = asyncio.create_task(
             run_regeneration_loop(app.state.sessionmaker, app.state.dish_scorer)
         )
+    # Deletes non-returned recommendation items after 30 days (log_retention.py).
+    retention_task = asyncio.create_task(run_retention_loop(app.state.sessionmaker))
     try:
         yield
     finally:
+        retention_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await retention_task
         if loop_task is not None:
             loop_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
