@@ -69,6 +69,10 @@ RECO-04 (`POST /feedback`, sent by the outbox worker for each like / dislike) ap
 - A dish reco never received is 404 `DISH_NOT_FOUND` (the worker marks the event dead). A dish whose vector is `pending` or `failed` is 503 `DISH_VECTOR_NOT_READY` with `Retry-After: 60`, so the worker retries; the user's later events wait behind it. A deactivated dish that has a vector still counts.
 - `occurred_at` needs a time zone: the latest `occurred_at` is the vote counted in `dish_stats`. An older event that arrives late still adds to r, n, the user vector and m.
 
+### Log retention
+
+RECO-05 logs every candidate it ranks in `recommendation_items` (up to 2000 rows per call). A background task (`app/services/log_retention.py`, started with the app, every hour) deletes the rows that were not returned to the user (`is_returned = false`) once their log is older than 30 days, in batches of 5000 per transaction. `recommendation_logs` and returned items are kept: they are what the evaluation (Design §6.2: like-rate of top-k, replay) reads.
+
 ### Algorithm configuration
 
 Every recommendation uses the one row of `algorithm_configs` with `is_active = true` and logs its `config_version`. Migrations add configurations; they never switch the active one silently.
