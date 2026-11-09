@@ -1,7 +1,7 @@
 """Preference survey: RECO-03 (submit or skip) and RECO-09 (status).
 
 Answers become the user vector by Recommendation_System_Design_Ver1.1 §3.2; the options and their
-vectors are in .docs/Preference_Survey_Ver1.0.md (table survey_option_vectors).
+vectors are in docs/Preference_Survey_Ver1.0.md (table survey_option_vectors).
 """
 
 from collections.abc import Sequence
