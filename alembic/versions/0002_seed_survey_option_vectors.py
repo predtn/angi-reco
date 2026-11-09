@@ -1,6 +1,6 @@
 """seed survey option vectors
 
-The 27 options of the preference survey (.docs/Preference_Survey_Ver1.0.md): for each option_code,
+The 27 options of the preference survey (docs/Preference_Survey_Ver1.0.md): for each option_code,
 its vector and the mask of the dimensions it has an opinion on.
 
 Revision ID: 0002
