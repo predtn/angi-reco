@@ -10,14 +10,20 @@ V12 = "[" + ",".join(["0.5"] * 12) + "]"
 ZERO12 = "[" + ",".join(["0"] * 12) + "]"
 
 
-def test_initial_config_is_active_without_ucb(db: Connection) -> None:
-    row = db.execute(
-        text("SELECT config_version, params FROM recommendation.algorithm_configs WHERE is_active")
-    ).one()
+def test_initial_config_has_no_ucb_and_one_config_is_active(db: Connection) -> None:
+    # Which version is active is an operating decision (docs/runtime-behavior.md); exactly one is.
+    assert (
+        db.execute(
+            text("SELECT count(*) FROM recommendation.algorithm_configs WHERE is_active")
+        ).scalar_one()
+        == 1
+    )
+    params = db.execute(
+        text("SELECT params FROM recommendation.algorithm_configs WHERE config_version = 1")
+    ).scalar_one()
 
-    assert row.config_version == 1
-    assert row.params["gamma"] == 0
-    assert row.params["ontology_version"] == 1
+    assert params["gamma"] == 0
+    assert params["ontology_version"] == 1
 
 
 def test_total_interactions_is_survey_answers_plus_feedback(db: Connection) -> None:
@@ -41,7 +47,11 @@ def test_user_dish_score_defaults_are_neutral(db: Connection) -> None:
     db.execute(text("INSERT INTO recommendation.user_dish_scores (user_id, dish_id) VALUES (1, 2)"))
 
     row = db.execute(
-        text("SELECT implicit_raw, implicit_score FROM recommendation.user_dish_scores")
+        # Only the row inserted here: a dev database also holds real scores.
+        text(
+            "SELECT implicit_raw, implicit_score FROM recommendation.user_dish_scores"
+            " WHERE user_id = 1 AND dish_id = 2"
+        )
     ).one()
     assert (row.implicit_raw, row.implicit_score) == (0, 0.5)
 

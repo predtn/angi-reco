@@ -42,7 +42,13 @@ def _cleanup(engine: Engine) -> None:
 @pytest.fixture
 def client(migrated_engine: Engine, api_key: str) -> Iterator[TestClient]:
     """Two dishes reco cannot tell apart (no vector, no votes); the user has seen 20 dishes, 10 of
-    them SEEN and none UNSEEN."""
+    them SEEN and none UNSEEN. Version 1 is active during the test; the version that was active
+    before (3 once the conversation floor is switched on) comes back afterwards."""
+    with migrated_engine.connect() as connection:
+        active = connection.execute(
+            text("SELECT config_version FROM recommendation.algorithm_configs WHERE is_active")
+        ).scalar_one()
+    _activate(migrated_engine, 1)
     _cleanup(migrated_engine)
     with migrated_engine.begin() as connection:
         connection.execute(
@@ -70,7 +76,7 @@ def client(migrated_engine: Engine, api_key: str) -> Iterator[TestClient]:
         with TestClient(create_app(), headers={"X-Api-Key": api_key}) as test_client:
             yield test_client
     finally:
-        _activate(migrated_engine, 1)
+        _activate(migrated_engine, active)
         _cleanup(migrated_engine)
 
 
@@ -97,7 +103,8 @@ def test_migration_adds_version_two_inactive_with_gamma_only_changed(
             )
         }
 
-    assert configs[1].is_active and not configs[2].is_active
+    # Added inactive; which version is active is an operating decision (runtime-behavior.md).
+    assert not configs[2].is_active
     assert configs[1].params["gamma"] == 0
     assert configs[2].params["gamma"] == 0.1
     assert {**configs[2].params, "gamma": 0} == configs[1].params

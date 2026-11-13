@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 from sqlalchemy.exc import OperationalError
 
 from app.db.session import get_session
@@ -58,5 +58,9 @@ def test_reports_active_config_without_api_key(migrated_engine: Engine) -> None:
     with TestClient(create_app()) as client:
         response = client.get("/health")
 
+    with migrated_engine.connect() as connection:
+        active = connection.execute(
+            text("SELECT config_version FROM recommendation.algorithm_configs WHERE is_active")
+        ).scalar_one()
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "db": "ok", "active_config_version": 1}
+    assert response.json() == {"status": "ok", "db": "ok", "active_config_version": active}

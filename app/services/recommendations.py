@@ -29,7 +29,14 @@ from app.models import (
     UserPreferenceVector,
 )
 from app.models.enums import DishVectorStatus
-from app.services.scoring import Candidate, Params, ScoredCandidate, UserState, rank_candidates
+from app.services.scoring import (
+    Candidate,
+    Params,
+    ScoredCandidate,
+    UserState,
+    effective_m,
+    rank_candidates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +80,7 @@ async def recommend(
         k_prime=float(config.params["k_prime"]),
         z=float(config.params["z"]),
         gamma=float(config.params["gamma"]),
+        conversation_m_min=int(config.params.get("conversation_m_min", 0)),
     )
 
     ordered_ids = list(dict.fromkeys(candidate_dish_ids))
@@ -93,12 +101,14 @@ async def recommend(
     ignored = [dish_id for dish_id in ordered_ids if dish_id not in dishes]
 
     user = None
+    real_m = 0
     scores: dict[int, UserDishScore] = {}
     if user_id is not None:
         preference = await session.get(UserPreferenceVector, user_id)
+        real_m = 0 if preference is None else (preference.total_interactions or 0)
         user = UserState(
             vector=None if preference is None else preference.vec,
-            m=0 if preference is None else (preference.total_interactions or 0),
+            m=real_m,
             n_total=0 if preference is None else preference.total_shown,
         )
         scores = {
@@ -111,11 +121,15 @@ async def recommend(
         }
 
         if vector_source == "conversation":
-            user = UserState(
-                vector=user_vector_override
+            vector = (
+                user_vector_override
                 if user_vector_override is not None and any(user_vector_override)
-                else None,
-                m=user.m,
+                else None
+            )
+            user = UserState(
+                vector=vector,
+                # A stated taste counts even for a new user (Conversation_Preferences).
+                m=effective_m(user.m, vector is not None, params.conversation_m_min),
                 n_total=user.n_total,
             )
 
@@ -143,6 +157,7 @@ async def recommend(
     if user_id is None or user is None or not ranked:
         return RecommendationResult(None, config.config_version, ranked[:top_k], ignored)
 
+    # Δ as ranked (with the conversation floor); the log keeps the real m next to it.
     delta = user.m / (user.m + params.k_prime)
     request_id = await session.scalar(
         insert(RecommendationLog)
@@ -152,7 +167,7 @@ async def recommend(
             context=context,
             vector_source=vector_source,
             effective_vector=None if user.vector is None else [float(v) for v in user.vector],
-            m=user.m,
+            m=real_m,
             n_total=user.n_total,
             delta=delta,
             candidate_count=len(ordered_ids),
