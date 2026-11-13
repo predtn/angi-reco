@@ -9,6 +9,7 @@ from app.services.scoring import (
     Params,
     UserState,
     cosine,
+    effective_m,
     exploration_score,
     implicit_score,
     minmax_explicit,
@@ -169,3 +170,36 @@ def test_a_vector_that_reaches_zero_is_stored_as_none() -> None:
     dish = _vector(spicy=1)
 
     assert move_user_vector(_vector(spicy=0.5), dish, 1, -1) is None
+
+
+# Conversation floor on m (Conversation_Preferences_Ver1.0, config_version 3).
+
+
+def test_effective_m_raises_only_a_conversation_vector_below_the_floor() -> None:
+    assert effective_m(0, True, 5) == 5
+    assert effective_m(3, True, 5) == 5
+    assert effective_m(8, True, 5) == 8  # already above: the real m
+    assert effective_m(0, False, 5) == 0  # profile request or null/zero conversation vector
+    assert effective_m(0, True, 0) == 0  # versions 1 and 2 have no floor
+
+
+def test_floor_lets_a_new_users_stated_taste_beat_a_popular_dish() -> None:
+    """The example of the design discussion: "Nay tôi thích ăn một chút đồ cay" from a new user.
+
+    A spicy dish nobody voted on against a popular non-spicy one (6 likes, Wilson ≈ 0.61)."""
+    stated = _vector(spicy=0.25)
+    spicy = _candidate(1, _vector(spicy=0.75, salty=0.25))
+    popular = _candidate(2, _vector(sweet=1.0, cooling=0.75), likes=6)
+    candidates = [spicy, popular]
+
+    without_floor = rank_candidates(
+        candidates, UserState(stated, effective_m(0, True, 0), 0), PARAMS
+    )
+    assert [item.dish_id for item in without_floor] == [2, 1]  # Δ = 0: Wilson only
+
+    with_floor = rank_candidates(candidates, UserState(stated, effective_m(0, True, 5), 0), PARAMS)
+    assert [item.dish_id for item in with_floor] == [1, 2]
+    top = with_floor[0]
+    # Δ = 5 / (5 + 5) = 0.5, Explicit 1 after MinMax, no votes
+    assert top.final == pytest.approx(0.5 * top.personalized + 0.5 * top.wilson)
+    assert top.final == pytest.approx(0.5)

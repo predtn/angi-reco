@@ -89,6 +89,36 @@ def test_conversation_vector_changes_ranking_without_writing_profile(
         assert row.effective_vector == SPICY_VEC
 
 
+def _activate(engine: Engine, version: int) -> int:
+    """Switches the active config (everything off first: the unique index is checked row by row)
+    and returns the version that was active before."""
+    with engine.begin() as connection:
+        previous = connection.execute(
+            text("SELECT config_version FROM recommendation.algorithm_configs WHERE is_active")
+        ).scalar_one()
+        connection.execute(text("UPDATE recommendation.algorithm_configs SET is_active = false"))
+        connection.execute(
+            text(
+                "UPDATE recommendation.algorithm_configs SET is_active = true"
+                " WHERE config_version = :v"
+            ),
+            {"v": version},
+        )
+    return previous
+
+
+@pytest.fixture
+def without_conversation_floor(migrated_engine: Engine) -> Iterator[None]:
+    """Version 1: no conversation floor on m (config_version 3 and later have one, see
+    test_conversation_m_floor.py)."""
+    previous = _activate(migrated_engine, 1)
+    try:
+        yield
+    finally:
+        _activate(migrated_engine, previous)
+
+
+@pytest.mark.usefixtures("without_conversation_floor")
 def test_cold_start_and_zero_vector_keep_existing_algorithm(
     client: TestClient, migrated_engine: Engine
 ) -> None:

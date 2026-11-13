@@ -34,13 +34,17 @@ Every recommendation uses the one row of `algorithm_configs` with `is_active = t
 |---|---|---|
 | 1 | Design §3.5, γ = 0 (no exploration) | active |
 | 2 | same as 1, γ = 0.1 (UCB, Design §3.4) | added inactive (migration 0003) |
+| 3 | same as 1, plus `conversation_m_min = 5`: a conversation request with a vector uses max(m, 5) in Δ ([conversation preferences](Conversation_Preferences_Ver1.0.md)) | added inactive (migration 0005); switch to it to turn the floor on |
+| 4 | same as 3, γ = 0.1: the conversation floor and UCB together | added inactive (migration 0006) |
+
+A version without `conversation_m_min` behaves as 0 (no floor), so switching to version 2 drops the floor; version 4 has both the floor and UCB.
 
 UCB only changes the ranking once the app reports impressions (IMP-01 → RECO-06): until then N_total = 0 and every Exploration score is 0. Switch versions in one transaction, the old one off first (the unique index on `is_active` is checked row by row):
 
 ```sql
 BEGIN;
 UPDATE recommendation.algorithm_configs SET is_active = false WHERE is_active;
-UPDATE recommendation.algorithm_configs SET is_active = true WHERE config_version = 2;  -- 1 to go back
+UPDATE recommendation.algorithm_configs SET is_active = true WHERE config_version = 3;  -- the version to use
 COMMIT;
 ```
 

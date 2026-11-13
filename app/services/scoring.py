@@ -23,6 +23,8 @@ class Params:
     k_prime: float
     z: float
     gamma: float
+    # Floor on m for a conversation vector (config_version 3); 0 = no floor (versions 1 and 2).
+    conversation_m_min: int = 0
 
 
 @dataclass(frozen=True)
@@ -62,6 +64,19 @@ class ScoredCandidate:
     final: float
     exploration: float
     recommend: float
+
+
+def effective_m(m: int, has_conversation_vector: bool, conversation_m_min: int) -> int:
+    """m used in Δ = m / (m + k′).
+
+    A taste stated in the Agent conversation is the user's intent for this request, so it is
+    trusted even before any survey answer or like: with a conversation vector, m is raised to
+    `conversation_m_min` (Δ = 0.5 for a new user with the floor 5 and k′ = 5). Users already
+    above the floor keep their m. The floor is per request; it is never stored or added to m.
+    """
+    if has_conversation_vector:
+        return max(m, conversation_m_min)
+    return m
 
 
 def wilson_lower_bound(likes: int, dislikes: int, z: float) -> float:

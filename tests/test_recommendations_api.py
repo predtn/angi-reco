@@ -104,7 +104,13 @@ def test_guest_is_ranked_by_wilson_and_not_logged(
     assert response.status_code == 200
     body = response.json()
     assert body["request_id"] is None
-    assert body["config_version"] == 1
+    with migrated_engine.connect() as connection:
+        assert (
+            body["config_version"]
+            == connection.execute(
+                text("SELECT config_version FROM recommendation.algorithm_configs WHERE is_active")
+            ).scalar_one()
+        )
     # Sweet has community likes; spicy and pending tie at Wilson 0 and keep the order sent.
     assert [item["dish_id"] for item in body["items"]] == [SWEET, SPICY]
     assert body["ignored_dish_ids"] == [INACTIVE, UNKNOWN]
@@ -130,7 +136,14 @@ def test_surveyed_user_gets_personalized_ranking_and_a_full_log(
     first = body["items"][0]
     assert first["rank"] == 1
     assert first["explicit_score"] == 1
-    assert first["recommend_score"] == pytest.approx(first["final_score"])  # γ = 0
+    with migrated_engine.connect() as connection:
+        gamma = connection.execute(
+            text("SELECT params->>'gamma' FROM recommendation.algorithm_configs WHERE is_active")
+        ).scalar_one()
+    # Recommend = (1 − γ)·Final + γ·Exploration with the active version's γ (§3.4).
+    assert first["recommend_score"] == pytest.approx(
+        (1 - float(gamma)) * first["final_score"] + float(gamma) * first["exploration"]
+    )
     assert set(first) == {
         "dish_id", "rank", "recommend_score", "final_score", "explicit_score", "wilson",
         "exploration",

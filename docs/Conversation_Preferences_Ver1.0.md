@@ -10,7 +10,15 @@ This extension preserves ontology version 1, scoring formulas and cold-start.
   Profile requests cannot override. Zero becomes null; conversation null does not fall
   back to the profile. Responses echo the source and logs snapshot the actual vector.
 - Session targets and inheritance are managed by the backend, never persisted to the
-  long-term profile. m, implicit, Wilson and exploration remain based on existing data.
+  long-term profile. Implicit, Wilson and exploration remain based on existing data.
+- Conversation floor on m (config_version 3, `conversation_m_min = 5`): a conversation request
+  with a non-null vector ranks with m_eff = max(m, conversation_m_min), so
+  Δ = m_eff / (m_eff + k′) is 0.5 for a new user instead of 0 and the stated taste counts
+  as much as the pooled Wilson score. Users with m ≥ 5 are unchanged; as real survey answers
+  and likes/dislikes raise m past the floor, the floor stops mattering. The floor is never
+  stored and never added to m. Profile requests, a null/zero conversation vector and configs
+  without the key (versions 1 and 2) keep Δ = m / (m + k′). `recommendation_logs.m` keeps the
+  real m; `recommendation_logs.delta` is the Δ actually used.
 - RECO-06 accepts an internal positive agent_proposal_id. For conversation-source
   requests it is required; missing references return 409 AGENT_COMMIT_REQUIRED.
   Backend queues all committed dishes in a transactional outbox and sends after commit.

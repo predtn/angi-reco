@@ -131,8 +131,12 @@ def test_first_like_creates_the_user_vector_and_every_derived_row(
     assert response.status_code == 200
     assert response.json()["result"] == "applied"
     state = _state(migrated_engine)
+    with migrated_engine.connect() as connection:
+        active = connection.execute(
+            text("SELECT config_version FROM recommendation.algorithm_configs WHERE is_active")
+        ).scalar_one()
     assert [(e.event_type, e.w, str(e.request_id), e.config_version) for e in state["events"]] == [
-        ("like", 1, request_id, 1)
+        ("like", 1, request_id, active)
     ]
     # No vector yet: User_old = 0, so the first like gives β_u·Dish (§3.2).
     assert state["vector"] == pytest.approx(_vector(spicy=BETA, umami=BETA * 0.5))
