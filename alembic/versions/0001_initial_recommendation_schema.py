@@ -35,8 +35,9 @@ INITIAL_PARAMS = {
 
 
 def upgrade() -> None:
-    # Locally and on Render a superuser installs vector first (a non-superuser cannot create it),
-    # so this is a no-op there; it only matters on a database where angi_reco is the owner.
+    # Locally and on the server the Postgres init script installs vector first as superuser (a
+    # non-superuser cannot create it), so this is a no-op there; it only matters on a database
+    # where angi_reco is the owner.
     op.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public")
 
     algorithm_configs = op.create_table(

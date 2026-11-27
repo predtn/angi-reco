@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level)
-    # The service is reachable from the internet on Render, so the docs are off in production.
+    # Only the backend calls the service in production, so the docs and schema are not served there.
     show_docs = settings.environment != "production"
 
     app = FastAPI(
