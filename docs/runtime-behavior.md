@@ -24,7 +24,7 @@ RECO-04 (`POST /feedback`, sent by the outbox worker for each like / dislike) ap
 
 ## Log retention
 
-RECO-05 logs every candidate it ranks in `recommendation_items` (up to 2000 rows per call). A background task (`app/services/log_retention.py`, started with the app, every hour) deletes the rows that were not returned to the user (`is_returned = false`) once their log is older than 30 days, in batches of 5000 per transaction. `recommendation_logs` and returned items are kept: they are what the evaluation (Design §6.2: like-rate of top-k, replay) reads.
+RECO-05 logs every candidate it ranks in `recommendation_items` (up to 2000 rows per call). A background task (`app/services/log_retention.py`, started with the app, every hour) deletes the rows that were not returned to the user (`is_returned = false`) once their log is older than 2 days, in batches of 5000 per transaction. A row counts as returned when its rank is within the request's `top_k`, so the task only removes the tail beyond `top_k`: with the backend's current `top_k` (DISH-01 and Agent 2000, roadmap AI 1000, roll 200), DISH-01 and Agent requests leave almost nothing to delete. `recommendation_logs` and returned items are kept: they are what the evaluation (Design §6.2: like-rate of top-k, replay) reads.
 
 ## Algorithm configuration
 
