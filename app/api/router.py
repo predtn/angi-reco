@@ -12,7 +12,7 @@ protected_router.include_router(recommendations.router)
 protected_router.include_router(survey.router)
 protected_router.include_router(user_preferences.router)
 
-# Endpoints without X-Api-Key: only /health (RECO-07), polled by Render and the Admin.
+# Endpoints without X-Api-Key: only /health (RECO-07), polled by the Docker healthcheck and Admin.
 public_router = APIRouter()
 public_router.include_router(health.router)
 
