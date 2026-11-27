@@ -326,11 +326,11 @@ def test_score_copy_failure_rolls_back_the_parent_log(
     [
         {"candidate_dish_ids": [], "context": "list"},
         {"candidate_dish_ids": [1] * 2001, "context": "list"},
-        {"candidate_dish_ids": [1], "context": "list", "top_k": 201},
+        {"candidate_dish_ids": [1], "context": "list", "top_k": 2001},
         {"candidate_dish_ids": [1], "context": "search"},
         {"candidate_dish_ids": [1]},
     ],
-    ids=["no-candidate", "more-than-2000", "top-k-201", "unknown-context", "no-context"],
+    ids=["no-candidate", "more-than-2000", "top-k-2001", "unknown-context", "no-context"],
 )
 def test_invalid_recommendation_body(client: TestClient, body: dict[str, Any]) -> None:
     response = client.post("/recommendations", json=body)

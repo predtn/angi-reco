@@ -17,7 +17,7 @@ from app.models.recommendation import RecommendationItem, RecommendationLog
 
 logger = logging.getLogger(__name__)
 
-RETENTION_DAYS = 30
+RETENTION_DAYS = 2
 CLEANUP_INTERVAL_SECONDS = 60 * 60
 # One batch per transaction: short locks, and a slow first run does not hold the table.
 BATCH_SIZE = 5000

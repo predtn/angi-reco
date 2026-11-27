@@ -52,7 +52,7 @@ services:
 | Point | Why |
 |---|---|
 | Migrations at start | `alembic upgrade head` (schema `recommendation`) runs every time the container starts, before `uvicorn`. It reads the same environment as the service, so `RECO_API_KEY` must already be set |
-| **1 container, 1 worker** | Two background loops run inside the process (dish vectors every 5 minutes, 30-day log retention every hour); more workers or containers would run them twice |
+| **1 container, 1 worker** | Two background loops run inside the process (dish vectors every 5 minutes, 2-day log retention every hour); more workers or containers would run them twice |
 | `restart: unless-stopped`, always on | The backend waits 800 ms for a ranking (3 s for the assistant), so while reco is down or starting, requests fall back to the backend's order by rating, which is not personalized |
 | Health check | `/health` (RECO-07): 200 with the active algorithm config when PostgreSQL answers; no `X-Api-Key` |
 

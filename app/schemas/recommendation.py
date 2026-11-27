@@ -17,7 +17,7 @@ class RecommendationRequest(BaseModel):
     user_id: int | None = Field(default=None, gt=0)
     # Filtered and sorted by the backend (restaurant rating, then like_count); at most 2000
     candidate_dish_ids: list[int] = Field(min_length=1, max_length=2000)
-    top_k: int = Field(default=DEFAULT_TOP_K, ge=1, le=200)
+    top_k: int = Field(default=DEFAULT_TOP_K, ge=1, le=2000)
     context: RecoContext
     vector_source: Literal["profile", "conversation"] = "profile"
     user_vector_override: list[FiniteFloat] | None = Field(
