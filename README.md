@@ -104,7 +104,7 @@ Adding an endpoint: request/response models in `app/schemas/`, the logic in `app
 
 ## Deployment
 
-Production runs on Render as a Python web service with a single instance and worker, migrations applied by a pre-deploy step, and reco released before the backend. See [deploy](docs/deploy.md).
+Production is self-hosted with Docker Compose: one container with a single worker in the same project as the backend, migrations applied by `alembic upgrade head` when the container starts, and reco released before the backend. See [deploy](docs/deploy.md).
 
 ## Documentation
 
@@ -117,7 +117,7 @@ Production runs on Render as a Python web service with a single instance and wor
 | Tables and columns | `angi-backend/docs/ANGI_Data_Dictionary_Ver*.xlsx`, sheet "Recommendation" |
 | Runtime behavior | [docs/runtime-behavior.md](docs/runtime-behavior.md) |
 | Migrations | [docs/migrations.md](docs/migrations.md) |
-| Deploy (Render) | [docs/deploy.md](docs/deploy.md) |
+| Deploy (self-hosted) | [docs/deploy.md](docs/deploy.md) |
 
 ## Contributing
 

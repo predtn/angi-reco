@@ -13,7 +13,7 @@ alembic check            # must print "No new upgrade operations detected."
 
 - Number revisions in order (`0002`, `0003`, ...). If two pull requests create the same number, the one merged second regenerates its revision on the new head.
 - Autogenerate does not see data, raw SQL or extensions: seed rows and `CREATE EXTENSION` are written by hand (see `0001`).
-- `vector` must already exist in schema `public`, because role `angi_reco` cannot create extensions. The backend's init script installs it locally; on Render it is created once with the database's admin user when the environment is set up.
+- `vector` must already exist in schema `public`, because role `angi_reco` cannot create extensions. The backend's init script installs it locally; on the self-hosted server the same init script created it when the Postgres volume was first initialized.
 
 ## Conversation preferences (migration 0004)
 
